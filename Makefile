@@ -14,15 +14,15 @@ CHMOD = chmod
 CP = rsync -R
 # déclaration des options du compilateur
 CFLAGS = -Wall -O3
-CPPFLAGS = -I. -I/home/b845548/local/boost_1_63_0/
-LDFLAGS = -lm
+CPPFLAGS = -I. -I/home/hbxxx/boost_1_63_0 -std=c++11 
+LDFLAGS = -lm -std=c++11 
 
 # définition des fichiers et dossiers
-PROGNAME = sample_2d_03
+PROGNAME = visu
 VERSION = 0.2
 distdir = $(PROGNAME)-$(VERSION)
-HEADERS = 
-SOURCES = window.c
+HEADERS = graph.h
+SOURCES = window.c graph.c
 OBJ = $(SOURCES:.c=.o)
 DOXYFILE = documentation/Doxyfile
 EXTRAFILES = COPYING  
