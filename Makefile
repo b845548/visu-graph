@@ -21,8 +21,8 @@ LDFLAGS = -lm -std=c++11
 PROGNAME = visu
 VERSION = 0.2
 distdir = $(PROGNAME)-$(VERSION)
-HEADERS = graph.h
-SOURCES = window.c graph.c
+HEADERS =
+SOURCES = window.c
 OBJ = $(SOURCES:.c=.o)
 DOXYFILE = documentation/Doxyfile
 EXTRAFILES = COPYING  

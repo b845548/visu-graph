@@ -12,25 +12,100 @@
 #include <assert.h>
 #include <GL4D/gl4dp.h>
 #include <GL4D/gl4duw_SDL2.h>
-#include "graph.h"
+
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/bipartite.hpp>
+#include <boost/graph/graphviz.hpp>
+#include <random>
+#include <cassert>
+#include <algorithm>
+
+using namespace boost;
+
+typedef adjacency_list<vecS, vecS, undirectedS, no_property> Graph;
 
 
 typedef struct mobile_t mobile_t;
-
 struct mobile_t {
   float x, y, vx, vy, ax, ay;
   int r,r_vis;
   GLuint color;
 };
+
 static mobile_t * _mobiles = NULL;
 static int _nbMobiles = 1;
 static float _G[] = {0, -980};
-
 static Graph g;
-extern void random_graph(Graph& g, int nb_vertex, int perc);
 
+void graph_random(Graph& g, int nb_vertex, int perc) {
+    // Ajout de nb_vertex sommets
+    for(int i = 0; i < nb_vertex; ++i)
+        add_vertex(g);
+    
+    // Générateur de nombres pseudo-aléatoires
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<unsigned long> dis(0, nb_vertex - 1);
+    std::uniform_int_distribution<unsigned long> dis2(1, nb_vertex * perc / 100);
+    
+    // Ajout d'arêtes
+    for (auto pair_it = vertices(g);
+         pair_it.first != pair_it.second;
+         ++pair_it.first) {
+        int nb_edge = dis2(gen);
+        for(int i = 0; i < nb_edge; ++i) {
+            auto vertex1 = *pair_it.first;
+            auto vertex2 = dis(gen);
 
-void parcours(const Graph& g){
+            if(vertex2 != vertex1){
+                add_edge(vertex1, vertex2, g);
+		}
+        }
+    }
+}
+
+void graph_collision(){
+	static GLuint t0 = 0;
+	float rebondisement=0.3;
+	float gravity_center=0.009;
+	GLuint t;
+	GLfloat dt;
+	int i,j;
+	t = SDL_GetTicks();
+	dt = (t - t0) / 1000.0;
+	t0 = t;
+
+	for(i = 0; i < _nbMobiles; i++){ 
+		// collision dans le cadre
+		if(_mobiles[i].x + _mobiles[i].r >gl4dpGetWidth()) 
+			 	_mobiles[i].x = gl4dpGetWidth()-_mobiles[i].r;
+		if(_mobiles[i].x - _mobiles[i].r < 0) 
+			 	_mobiles[i].x = _mobiles[i].r;
+		if(_mobiles[i].y + _mobiles[i].r >gl4dpGetHeight()) 
+			 	_mobiles[i].y = gl4dpGetHeight()-_mobiles[i].r;
+		if(_mobiles[i].y - _mobiles[i].r < 0) 
+			 	_mobiles[i].y = _mobiles[i].r;
+		if((_mobiles[i].x - _mobiles[i].r < 0 && _mobiles[i].vx < 0) || 
+		(_mobiles[i].x + _mobiles[i].r >= gl4dpGetWidth() && _mobiles[i].vx > 0))
+			 	_mobiles[i].vx = -_mobiles[i].vx;
+		if((_mobiles[i].y - _mobiles[i].r <= 0 && _mobiles[i].vy < 0) || 
+		(_mobiles[i].y + _mobiles[i].r >= gl4dpGetHeight()&& _mobiles[i].vy > 0 ))
+				_mobiles[i].vy = -_mobiles[i].vy;
+		// collision dans le cadre
+		for(j = 0; j < _nbMobiles; j++){ 
+			if(i!=j&&pow(_mobiles[j].x-_mobiles[i].x,2)+pow(_mobiles[j].y-_mobiles[i].y,2)
+			<=pow(_mobiles[j].r+_mobiles[i].r,2)){
+				_mobiles[i].x -= (_mobiles[j].x - _mobiles[i].x) * rebondisement;
+				_mobiles[i].y -= (_mobiles[j].y - _mobiles[i].y) * rebondisement;
+				_mobiles[i].x -= (_mobiles[i].x - gl4dpGetWidth()) * gravity_center;
+				_mobiles[i].y -= (_mobiles[i].y - gl4dpGetHeight()) * gravity_center;
+				_mobiles[i].x += _mobiles[i].vx * dt;
+				_mobiles[i].y += _mobiles[i].vy * dt;
+	  		}
+		}
+	}
+}
+void graph_centrer(const Graph& g){
 	float moyenne_x,moyenne_y,dist_x,dist_y;
 	int nb_edge;
 	float distance_mini=100; 
@@ -66,7 +141,9 @@ void parcours(const Graph& g){
 			}
 		}
     }
+}
 
+void graph_draw(const Graph& g){
     for(auto it_v = vertices(g);it_v.first != it_v.second;++it_v.first){ 
 		for(auto it_a = adjacent_vertices(*it_v.first, g);it_a.first !=it_a.second; ++it_a.first){
 			gl4dpSetColor(_mobiles[0].color);
@@ -77,13 +154,7 @@ void parcours(const Graph& g){
 			, _mobiles[*it_a.first].y, _mobiles[*it_a.first].r_vis);  
     	}
     }
-
 }
-
-
-
-
-
 
 void mobileInit(int n) {
   int i;
@@ -103,62 +174,17 @@ void mobileInit(int n) {
     _mobiles[i].color = rand();
   }
 
-    random_graph(g, 50, 2);
+    graph_random(g, 50, 2);
 } 
 
-void mobileMove(void) {
-	static GLuint t0 = 0;
-	GLuint t;
-	GLfloat dt;
-	int i,j;
-	float rebondisement=0.3;
-	float gravity_center=0.009;
-	t = SDL_GetTicks();
-	dt = (t - t0) / 1000.0;
-	t0 = t;
-  
-	for(i = 0; i < _nbMobiles; i++){ 
-		// collision dans le cadre
-		if(_mobiles[i].x + _mobiles[i].r >gl4dpGetWidth()) 
-			 	_mobiles[i].x = gl4dpGetWidth()-_mobiles[i].r;
-		if(_mobiles[i].x - _mobiles[i].r < 0) 
-			 	_mobiles[i].x = _mobiles[i].r;
-		if(_mobiles[i].y + _mobiles[i].r >gl4dpGetHeight()) 
-			 	_mobiles[i].y = gl4dpGetHeight()-_mobiles[i].r;
-		if(_mobiles[i].y - _mobiles[i].r < 0) 
-			 	_mobiles[i].y = _mobiles[i].r;
-		if((_mobiles[i].x - _mobiles[i].r < 0 && _mobiles[i].vx < 0) || 
-		(_mobiles[i].x + _mobiles[i].r >= gl4dpGetWidth() && _mobiles[i].vx > 0))
-			 	_mobiles[i].vx = -_mobiles[i].vx;
-		if((_mobiles[i].y - _mobiles[i].r <= 0 && _mobiles[i].vy < 0) || 
-		(_mobiles[i].y + _mobiles[i].r >= gl4dpGetHeight()&& _mobiles[i].vy > 0 ))
-				_mobiles[i].vy = -_mobiles[i].vy;
-		// collision dans le cadre
-		for(j = 0; j < _nbMobiles; j++){ 
-			if(i!=j&&pow(_mobiles[j].x-_mobiles[i].x,2)+pow(_mobiles[j].y-_mobiles[i].y,2)
-			<=pow(_mobiles[j].r+_mobiles[i].r,2)){
-				_mobiles[i].x -= (_mobiles[j].x - _mobiles[i].x) * rebondisement;
-				_mobiles[i].y -= (_mobiles[j].y - _mobiles[i].y) * rebondisement;
-				_mobiles[i].x -= (_mobiles[i].x - gl4dpGetWidth()) * gravity_center;
-				_mobiles[i].y -= (_mobiles[i].y - gl4dpGetHeight()) * gravity_center;
-				_mobiles[i].x += _mobiles[i].vx * dt;
-				_mobiles[i].y += _mobiles[i].vy * dt;
-	  		}
-		}
-	}
-}
-
-void mobileDraw(void) {
-parcours(g);
-}
-
 static void idle(void) {
-  mobileMove();
+graph_centrer(g);
+graph_collision();
 }
 
 static void draw(void) {
   gl4dpClearScreenWith (RGB(0, 0, 0));
-  mobileDraw();
+  graph_draw(g);
   gl4dpUpdateScreen(NULL);
 }
 /*!\brief appelée au moment de sortir du programme (atexit), elle
@@ -169,13 +195,6 @@ static void quit(void) {
 }
 /*!\brief créé la fenêtre, un screen 2D, place la fonction display et
  * appelle la boucle principale.*/
-
-
-
-
-
-
-
 
 
 int main(int argc, char ** argv) {
