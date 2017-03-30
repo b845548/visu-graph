@@ -23,6 +23,7 @@
 using namespace boost;
 
 typedef adjacency_list<vecS, vecS, undirectedS, no_property> Graph;
+typedef boost::graph_traits <Graph>::edge_iterator edgeIt;
 
 typedef struct graph_parametre graph_parametre;
 struct graph_parametre{
@@ -34,7 +35,10 @@ struct graph_parametre{
 	float gravity;
 	float rebound;
 	float distance_min;
-	float step;
+	float center;
+	float intersection;
+	float progress;
+	float solution;
 };
 typedef struct mobile_t mobile_t;
 struct mobile_t {
@@ -76,17 +80,88 @@ void graph_random(Graph& g, int nb_vertex, int perc) {
     }
 }
 void graph_init(){
-_gp.nb_node=50;
-_gp.max_adjacent=3;
-_gp.rayon=20;
-_gp.rayon_visual=5;
-_gp.gravity=0.009;
-_gp.rebound=0.3;
-_gp.distance_min=100.; 
-_gp.speed=3.0;
-_gp.step=0.01;
+_gp.nb_node=50; // nb node
+_gp.max_adjacent=3;// max adjacent
+_gp.rayon=25;// point phisque
+_gp.rayon_visual=5; // point visible
+_gp.speed=3.0; // rapidite de deplacement vx initial
+_gp.center=0.01; // facteur pour centrer un sommet autours les adjacents, moyenne == 0 on est au centre 
+_gp.progress=1.00;// progresse de 1 vers 0
+_gp.solution=0.045;// solution opmtimale
+_gp.gravity=0.007; // gravite vers centre, pour eviter que le sommet se deplace vers le frontier
+_gp.rebound=0.3; // facteur de rebondisement
+_gp.distance_min=100.; //  moyenne de la distance des adjacents
+_gp.intersection=0.3; // facteur intersection
+
 graph_random(_g, _gp.nb_node, _gp.max_adjacent);
+for(std::pair<edgeIt,edgeIt> ei = boost::edges(_g); ei.first != ei.second; ++ei.first) {
+        std::cout << source(*ei.first, _g) << " -> " << target(*ei.first, _g) << std::endl;
+    }
 }
+bool is_intersection(int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4){
+    float denominator = ((x2 - x1) * (y4 - y3)) - ((y2 - y1) * (x4 - x3));
+    float numerator1 = ((y1 - y3) * (x4 - x3)) - ((x1 - x3) * (y4 - y3));
+    float numerator2 = ((y1 - y3) * (x2 -  x1)) - ((x1 - x3) * (y2 - y1));
+
+    // Detect coincident lines (has a problem, read below)
+    if (denominator == 0) return numerator1 == 0 && numerator2 == 0;
+    float r = numerator1 / denominator;
+    float s = numerator2 / denominator;
+
+    return (r >= 0 && r <= 1) && (s >= 0 && s <= 1);
+}
+
+
+void graph_draw_intersection(){
+	int s1,s2,s3,s4;
+	float dist_x,dist_y;
+int count=0,nb_eg=0;
+for(std::pair<edgeIt,edgeIt> ei2 = boost::edges(_g); ei2.first != ei2.second; ++ei2.first) {
+//    std::cout << source(*ei2.first, _g) << " -> " << target(*ei2.first, _g) << std::endl;
+	nb_eg++;
+	for(std::pair<edgeIt,edgeIt> ei = boost::edges(_g); ei.first != ei.second; ++ei.first) {
+		s1=source(*ei.first, _g);
+		s2=target(*ei.first, _g);
+		s3=source(*ei2.first, _g);
+		s4=target(*ei2.first, _g);
+		if(s1!=s3&&s2!=s4)
+		if(s1!=s2&&s3!=s4)
+		if(s1!=s4&&s2!=s3){
+			if(is_intersection(_mobiles[s1].x,_mobiles[s1].y,_mobiles[s2].x,_mobiles[s2].y
+			,_mobiles[s3].x,_mobiles[s3].y,_mobiles[s4].x,_mobiles[s4].y)){
+				gl4dpSetColor(RGB(255,0,0));
+				gl4dpLine(_mobiles[s1].x, _mobiles[s1].y,_mobiles[s2].x, _mobiles[s2].y);
+				gl4dpLine(_mobiles[s3].x, _mobiles[s3].y,_mobiles[s4].x, _mobiles[s4].y);
+			count++;
+			dist_x=_mobiles[s1].x -_mobiles[s2].x;
+			dist_y=_mobiles[s1].y -_mobiles[s2].y;
+				int rd=rand()%4;				
+				if(rd==0){
+				_mobiles[s1].x-=dist_x*_gp.intersection*_gp.progress;
+				_mobiles[s1].y-=dist_y*_gp.intersection*_gp.progress;
+				}else if(rd==1){
+				_mobiles[s2].x+=dist_x*_gp.intersection*_gp.progress;
+				_mobiles[s2].y+=dist_y*_gp.intersection*_gp.progress;				
+				}else if(rd==2){
+				_mobiles[s3].x-=dist_x*_gp.intersection*_gp.progress;
+				_mobiles[s3].y-=dist_y*_gp.intersection*_gp.progress;				
+				}else if(rd==3){
+				_mobiles[s4].x+=dist_x*_gp.intersection*_gp.progress;
+				_mobiles[s4].y+=dist_y*_gp.intersection*_gp.progress;				
+				}
+
+
+		
+			}
+		}
+
+    }
+}
+    std::cout << _gp.progress<< std::endl;
+_gp.progress=(count*2/8)/(float)nb_eg;
+}
+
+
 
 
 void graph_collision(){
@@ -118,12 +193,18 @@ void graph_collision(){
 		for(j = 0; j < _nbMobiles; j++){ 
 			if(i!=j&&pow(_mobiles[j].x-_mobiles[i].x,2)+pow(_mobiles[j].y-_mobiles[i].y,2)
 			<=pow(_mobiles[j].r+_mobiles[i].r,2)){
-				_mobiles[i].x -= (_mobiles[j].x - _mobiles[i].x) * _gp.rebound;
-				_mobiles[i].y -= (_mobiles[j].y - _mobiles[i].y) * _gp.rebound;
-				_mobiles[i].x -= (_mobiles[i].x - gl4dpGetWidth()) * _gp.gravity;
-				_mobiles[i].y -= (_mobiles[i].y - gl4dpGetHeight()) * _gp.gravity;
-				_mobiles[i].x += _mobiles[i].vx * dt;
-				_mobiles[i].y += _mobiles[i].vy * dt;
+				if(rand()%2==0){// eloigner i
+					_mobiles[i].x -= (_mobiles[j].x - _mobiles[i].x) * _gp.rebound*_gp.progress;
+					_mobiles[i].y -= (_mobiles[j].y - _mobiles[i].y) * _gp.rebound*_gp.progress;
+				}else{// eloigner j
+					_mobiles[j].x += (_mobiles[j].x - _mobiles[i].x) * _gp.rebound*_gp.progress;
+					_mobiles[j].y += (_mobiles[j].y - _mobiles[i].y) * _gp.rebound*_gp.progress;
+				}
+
+				_mobiles[i].x -= (_mobiles[i].x - gl4dpGetWidth()/2) * _gp.gravity*_gp.progress;
+				_mobiles[i].y -= (_mobiles[i].y - gl4dpGetHeight()/2) * _gp.gravity*_gp.progress;
+				_mobiles[i].x += _mobiles[i].vx * dt*_gp.progress;
+				_mobiles[i].y += _mobiles[i].vy * dt*_gp.progress;
 	  		}
 		}
 	}
@@ -141,37 +222,40 @@ void graph_centrer(const Graph& g){
 			dist_y=_mobiles[*it_a.first].y -_mobiles[*it_v.first].y;
 			moyenne_x+=dist_x;
 			moyenne_y+=dist_y;
+/*
 			if(dist_x>_gp.distance_min){
-				_mobiles[*it_a.first].x -= dist_x * 0.1;
-				_mobiles[*it_a.first].vx -= dist_x * _gp.step;
+				_mobiles[*it_a.first].x -= dist_x * 0.1*_gp.progress;
+				_mobiles[*it_a.first].vx -= dist_x * _gp.step*_gp.progress;
 			}
 			if(dist_y>_gp.distance_min){
-				_mobiles[*it_a.first].y -= dist_y * 0.1;
-				_mobiles[*it_a.first].vy -= dist_y * _gp.step;
+				_mobiles[*it_a.first].y -= dist_y * 0.1*_gp.progress;
+				_mobiles[*it_a.first].vy -= dist_y * _gp.step*_gp.progress;
 			}
-    	}
+*/  
+  	}
 		if(nb_edge){
 			moyenne_x = moyenne_x / (float)nb_edge;	
 			moyenne_y = moyenne_y / (float)nb_edge;
 			if(moyenne_x>_gp.distance_min){
-				_mobiles[*it_v.first].x += moyenne_x * _gp.step;
-				_mobiles[*it_v.first].vx += moyenne_x * 0.1;
+				_mobiles[*it_v.first].x += moyenne_x * _gp.center*_gp.progress;
+				_mobiles[*it_v.first].vx += moyenne_x * _gp.center*_gp.progress;
 			}
 			if(moyenne_y>_gp.distance_min){
-				_mobiles[*it_v.first].y += moyenne_y * _gp.step;
-				_mobiles[*it_v.first].vy += moyenne_y * 0.1;
+				_mobiles[*it_v.first].y += moyenne_y * _gp.center*_gp.progress;
+				_mobiles[*it_v.first].vy += moyenne_y * _gp.center*_gp.progress;
 			}
 		}
     }
 }
 
-void graph_draw(const Graph& g){
+void graph_draw_node(const Graph& g){
     for(auto it_v = vertices(g);it_v.first != it_v.second;++it_v.first){ 
 		for(auto it_a = adjacent_vertices(*it_v.first, g);it_a.first !=it_a.second; ++it_a.first){
-			gl4dpSetColor(RGB(0, 255, 0));
-			gl4dpLine(_mobiles[*it_a.first].x, _mobiles[*it_a.first].y
-			,_mobiles[*it_v.first].x, _mobiles[*it_v.first].y);
-    		gl4dpSetColor(_mobiles[*it_a.first].color);
+
+				gl4dpSetColor(RGB(0,255,0));
+				gl4dpLine(_mobiles[*it_v.first].x,_mobiles[*it_v.first].y,_mobiles[*it_a.first].x,_mobiles[*it_a.first].y);
+
+			gl4dpSetColor(_mobiles[*it_a.first].color);
   			gl4dpFilledCircle(_mobiles[*it_a.first].x
 			, _mobiles[*it_a.first].y, _mobiles[*it_a.first].r_vis);  
     	}
@@ -198,13 +282,28 @@ void mobileInit(int n) {
 } 
 
 static void idle(void) {
-graph_centrer(_g);
-graph_collision();
+  if(_gp.progress>_gp.solution){
+	graph_centrer(_g);
+  }
+	graph_collision();
 }
-
+static void mouse(int button, int state, int x, int y) {
+  if(button == GL4D_BUTTON_LEFT&&state) {
+    y = gl4dpGetHeight() - y;
+	int i;
+	for(i = 0; i < _nbMobiles; i++){ 
+			if(pow(x-_mobiles[i].x,2)+pow(y-_mobiles[i].y,2)<=pow(_mobiles[i].r_vis,2)){
+			fprintf(stderr,"%d ",i);
+			break;	
+	  		}
+		}
+  }
+}
 static void draw(void) {
   gl4dpClearScreenWith (RGB(0, 0, 0));
-  graph_draw(_g);
+  graph_draw_node(_g);
+  if(_gp.progress>_gp.solution)
+     graph_draw_intersection();
   gl4dpUpdateScreen(NULL);
 }
 /*!\brief appelée au moment de sortir du programme (atexit), elle
@@ -225,6 +324,7 @@ int main(int argc, char ** argv) {
   graph_init();
   mobileInit(_gp.nb_node);
   atexit(quit);
+  gl4duwMouseFunc(mouse);
   gl4duwIdleFunc(idle);
   gl4duwDisplayFunc(draw);
   gl4duwMainLoop();
