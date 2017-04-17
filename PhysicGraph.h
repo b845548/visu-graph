@@ -1,3 +1,4 @@
+#include <iostream>
 #include <vector>
 #include <random>
 #include <cassert>
@@ -7,8 +8,6 @@
 #include <GL4D/gl4duw_SDL2.h>
 
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/bipartite.hpp>
-#include <boost/graph/graphviz.hpp>
 
 
 using namespace boost;
@@ -28,7 +27,7 @@ class PhysicGraph{
 
     private:
         Graph g;
-        std::vector<int> * densityGrid= new std::vector<int>[64]; //= new std::vector< std::vector<int> >(100);
+        std::vector<int> * densityGrid = new std::vector<int>[64];
 	    int nb_node;
 	    int max_adjacent;
 	    int rayon;
