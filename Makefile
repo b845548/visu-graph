@@ -15,15 +15,15 @@ CP = rsync -R
 # déclaration des options du compilateur
 CFLAGS = -Wall -O3
 CPPFLAGS = -I. -I/home/hbxxx/boost_1_63_0 -std=c++11 
-LDFLAGS = -lm -std=c++11 
+LDFLAGS = -lm -std=c++11 -I/home/hbxxx/boost_1_63_0
 
 # définition des fichiers et dossiers
 PROGNAME = visu
 VERSION = 0.2
 distdir = $(PROGNAME)-$(VERSION)
-HEADERS =
-SOURCES = window.c
-OBJ = $(SOURCES:.c=.o)
+HEADERS = PhysicGraph.h
+SOURCES = window.cpp PhysicGraph.cpp
+OBJ = $(SOURCES:.cpp=.o)
 DOXYFILE = documentation/Doxyfile
 EXTRAFILES = COPYING  
 DISTFILES = $(SOURCES) Makefile $(HEADERS) $(DOXYFILE) $(EXTRAFILES)
