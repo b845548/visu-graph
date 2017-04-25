@@ -15,7 +15,7 @@ CP = rsync -R
 # déclaration des options du compilateur
 CFLAGS = -Wall -O3
 CPPFLAGS = -I. -I/home/hbxxx/boost_1_63_0 -std=c++11 
-LDFLAGS = -lm -std=c++11 -I/home/hbxxx/boost_1_63_0
+LDFLAGS = -lm -L. -std=c++11 -I/home/hbxxx/boost_1_63_0
 
 # définition des fichiers et dossiers
 PROGNAME = visu

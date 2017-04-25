@@ -10,11 +10,11 @@ PhysicGraph::PhysicGraph(void)
     center=0.01; // facteur pour centrer un sommet autours les adjacents, moyenne == 0 on est au centre 
     progress=1.00;// progresse de 1 vers 0
     solution=0.045;// solution opmtimale
-    gravity=0.007; // gravite vers centre, pour eviter que le sommet se deplace vers le frontier
+    gravity=0.000007; // gravite vers centre, pour eviter que le sommet se deplace vers le frontier
     rebound=0.3; // facteur de rebondisement
-    distance_min=100.; //  moyenne de la distance des adjacents
+    distance_min=80.; //  moyenne de la distance des adjacents
     intersection=0.3; // facteur intersection
-    density_limite=4; // facteur intersection
+    density_limite=5; 
     screenWidth=512;    
     screenHeight=512; 
     grid_length=8;  
@@ -77,10 +77,10 @@ void PhysicGraph::initializeVertexProperty(void)
     {
         g[*it.first].x = gl4dmURand() * screenWidth;
         g[*it.first].y = gl4dmURand() * screenHeight;
-        g[*it.first].vx = gl4dmSURand() * screenWidth / speed;
         g[*it.first].vy = gl4dmSURand() * screenHeight / speed;
-        g[*it.first].ax = 0;
-        g[*it.first].ay = -980;
+        g[*it.first].gravityDirectionX = 0;
+        g[*it.first].vx = gl4dmSURand() * screenWidth / speed;
+        g[*it.first].gravityDirectionY = -980;
         g[*it.first].rayon = rayon;
         g[*it.first].rayon_visual = rayon_visual;
         g[*it.first].color = rand();
@@ -100,15 +100,6 @@ void PhysicGraph::printEdges(void)
 
 void PhysicGraph::collisionMove(double dt)
 {
-/*
-	static GLuint t0 = 0;
-	GLuint t;
-	GLfloat dt;
-	int i,j;
-	t = SDL_GetTicks();
-	dt = (t - t0) / 1000.0;
-	t0 = t;
-*/
 
 	int i,j;
 	for(i = 0; i < nb_node; i++)
@@ -141,18 +132,45 @@ void PhysicGraph::collisionMove(double dt)
 					g[j].x += (g[j].x - g[i].x) * rebound*progress;
 					g[j].y += (g[j].y - g[i].y) * rebound*progress;
 				}
-
-				g[i].x -= (g[i].x - screenWidth/2) * gravity*progress;
-				g[i].y -= (g[i].y - screenHeight/2) * gravity*progress;
-				g[i].x += g[i].vx * dt * progress;
-				g[i].y += g[i].vy * dt * progress;
 	  		}
 		}
 	}
 }
-
-
-void PhysicGraph::centerMove(double dt)
+void PhysicGraph::gravityMove(double dt)
+{
+	int i,j;
+	for(i = 0; i < nb_node; i++)
+    { 
+		for(j = 0; j < nb_node; j++)
+        { 
+			if(i!=j)
+            {
+				g[i].x -= (g[i].x - screenWidth/2) * gravity*progress;
+				g[i].y -= (g[i].y - screenHeight/2) * gravity*progress;
+            }
+		}
+	}
+}
+    
+void PhysicGraph::repulsionMove(double dt)
+{
+	int i,j;
+	for(i = 0; i < nb_node; i++)
+    { 
+		for(j = 0; j < nb_node; j++)
+        { 
+			if(i!=j)
+            {
+                if(edge(i,j,g).second==false)
+                {
+    				g[i].x += ((g[i].x-g[j].x)>0?1:-1)*0.01*progress;
+    				g[i].y += ((g[i].y-g[j].y)>0?1:-1)*0.01*progress;
+    	  		}
+            }
+		}
+	}
+}
+void PhysicGraph::attractionMove(double dt)
 {
 	float moyenne_x,moyenne_y,dist_x,dist_y;
 	int nb_edge;
@@ -168,17 +186,8 @@ void PhysicGraph::centerMove(double dt)
 			dist_y=g[*it_a.first].y -g[*it_v.first].y;
 			moyenne_x+=dist_x;
 			moyenne_y+=dist_y;
-/*
-			if(dist_x>_gp.distance_min){
-				g[*it_a.first].x -= dist_x * 0.1*_gp.progress;
-				g[*it_a.first].vx -= dist_x * _gp.step*_gp.progress;
-			}
-			if(dist_y>_gp.distance_min){
-				g[*it_a.first].y -= dist_y * 0.1*_gp.progress;
-				g[*it_a.first].vy -= dist_y * _gp.step*_gp.progress;
-			}
-*/  
-  	}
+      	}
+
 		if(nb_edge)
         {
 			moyenne_x = moyenne_x / (float)nb_edge;	
@@ -218,7 +227,6 @@ void PhysicGraph::intersectionMove(double dt)
     int count=0,nb_eg=0;
     for(std::pair<edgeIt,edgeIt> ei2 = boost::edges(g); ei2.first != ei2.second; ++ei2.first) 
     {
-    //    std::cout << source(*ei2.first, _g) << " -> " << target(*ei2.first, _g) << std::endl;
 	    nb_eg++;
 	    for(std::pair<edgeIt,edgeIt> ei = boost::edges(g); ei.first != ei.second; ++ei.first) 
         {
@@ -229,7 +237,6 @@ void PhysicGraph::intersectionMove(double dt)
 		    if(s1!=s3&&s2!=s4)
     		    if(s1!=s2&&s3!=s4)
         		    if(s1!=s4&&s2!=s3)
-                    {
 	        		    if(isIntersection(g[s1].x,g[s1].y,g[s2].x,g[s2].y,g[s3].x,g[s3].y,g[s4].x,g[s4].y))
                         {
         				    gl4dpSetColor(RGB(255,0,0));
@@ -260,14 +267,13 @@ void PhysicGraph::intersectionMove(double dt)
             				    g[s4].y+=dist_y*intersection*progress;				
         				    }
         			    }
-		            }
 
         }
     }
-    std::cout << progress<< std::endl;
-    progress=(count*2/8)/(float)nb_eg;
+    progress=count*6/(float)(nb_eg*nb_eg);
 }
-void PhysicGraph::drawNodes(void)
+void PhysicGraph::drawNodes(void
+)
 {
     for(auto it_v = vertices(g);it_v.first != it_v.second;++it_v.first)
     { 
@@ -278,9 +284,9 @@ void PhysicGraph::drawNodes(void)
 				gl4dpLine(g[*it_v.first].x,g[*it_v.first].y,g[*it_a.first].x,g[*it_a.first].y);
 	
 			gl4dpSetColor(g[*it_a.first].color);
-  			gl4dpFilledCircle(g[*it_a.first].x, g[*it_a.first].y, g[*it_a.first].rayon);  
+  		//	gl4dpFilledCircle(g[*it_a.first].x, g[*it_a.first].y, g[*it_a.first].rayon);  
 
-			gl4dpSetColor(RGB(0,0,0));
+		//	gl4dpSetColor(RGB(0,0,0));
   			gl4dpFilledCircle(g[*it_a.first].x, g[*it_a.first].y, g[*it_a.first].rayon_visual);  
 
     	}

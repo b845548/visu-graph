@@ -15,7 +15,7 @@ using namespace boost;
 typedef struct vertexProperty vertexProperty;
 struct vertexProperty
 {
-    float x, y, vx, vy, ax, ay;
+    float x, y, vx, vy, gravityDirectionX, gravityDirectionY;
     int rayon,rayon_visual;
     GLuint color;
 };
@@ -61,7 +61,10 @@ class PhysicGraph{
         int catchNode(int,int);
 
         void collisionMove(double);
-        void centerMove(double);
+        void attractionMove(double);
+		void repulsionMove(double);
+		void gravityMove(double);
+
         void intersectionMove(double);
         void densityMove(void);
 };
